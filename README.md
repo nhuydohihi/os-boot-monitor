@@ -168,6 +168,6 @@ BOOT MONITOR SUMMARY
 
 ## Author
 
-- Name: Do Thinh Huy
+- Name: Do Thi Nhu Y
 - GitHub: [nhuydohihi](https://github.com/nhuydohihi)
-- LinkedIn: `TODO: add LinkedIn profile link`
+- LinkedIn: https://www.linkedin.com/in/nhuydo/
