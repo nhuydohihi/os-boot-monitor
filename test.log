@@ -1,0 +1,9 @@
+NOTICE: Booting Trusted Firmware
+NOTICE: DRAM FW version 230830-20ebfacc
+DRAM: 768GB DDR5 5600 SYMBOL_64_16 ECC
+NOTICE: DDR init time elapsed: 00:03:56
+Tianocore/EDK2 firmware version 05.04.00005001
+[0.000000] Booting Linux on physical CPU 0x0000005200
+Fedora Linux 41 (Forty One)
+Kernel 6.12.1-ftk-ac04-64K-rel3+ on an aarch64
+localhost login:

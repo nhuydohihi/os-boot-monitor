@@ -1,0 +1,20 @@
+During boot up process, console will print out messages in succession like attached log file called "OS_bootup.log".
+Giving messages called "checkpoints" in order:
+    1. "Booting Trusted Firmware"
+    2. "DRAM FW version <dram_version>"
+    3. "DRAM: <ddr_capacity> DDR5 <ddr_speed> <ddr_ecc> ECC"
+    4. "DDR init time elapsed: <time>"
+    5. "Tianocore/EDK2 firmware version <firmware_version>"
+    6. "Booting Linux on physical CPU"
+    7. "Fedora Linux <linux_version>"
+    8. "Kernel <kernel_version>"
+    9. "login:"
+And messages called "errors" (each might appear anywhere during the process):
+    + "Hardware Error"
+    + "AER failed"
+    + "PCIe Bus Error"
+A good boot up (pass with CODE 0) is supposed to show up all "checkpoints" in given order. Otherwise, it fails with CODE -1.
+And during boot up, if any "errors" appears, it fails with CODE -2.
+
+Could you present your idea of a program to monitor the boot up process in real time to see if it completes with which CODE? Note that whenever "errors" appears, the monitor stop immediately
+If possible, write that program using Python. ("OS_bootup.log" file is a log of CODE 0 boot up. You can use it as a reference to do a simulation)
