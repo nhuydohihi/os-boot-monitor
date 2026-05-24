@@ -1,27 +1,130 @@
-# Boot Monitor
+# Ampere SLT Test Intern - OS Boot Monitor
 
-`boot_monitor.py` monitors a boot log and reports whether the boot process passes, fails, or stops because an error message appears.
+A Python-based boot log monitoring tool that checks whether an operating system boot process passes, fails because of missing checkpoints, or stops immediately when a critical error message appears.
 
-The program checks that all required boot checkpoints appear in the correct order. If any configured error appears at any time, monitoring stops immediately.
+This project was built for the Ampere SLT Test Intern assignment. During OS boot, the console prints messages continuously. The monitor reads those messages, validates required checkpoints in order, and reports the final boot result code.
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Problem Statement](#problem-statement)
+- [Diagram](#diagram)
+- [How It Works](#how-it-works)
+- [Project Structure](#project-structure)
+- [Requirements](#requirements)
+- [Usage](#usage)
+- [Result Codes](#result-codes)
+- [Required Checkpoints](#required-checkpoints)
+- [Error Messages](#error-messages)
+- [Output Example](#output-example)
+- [Video Demo](#video-demo)
+- [Author](#author)
+
+## Overview
+
+`boot_monitor.py` reads a boot log and returns one of three final results:
+
+- `CODE 0`: the boot process passes because all required checkpoints are found in the correct order.
+- `CODE -1`: the boot process fails because one or more checkpoints are missing or out of order.
+- `CODE -2`: the boot process fails because an error message is detected.
+
+The tool supports two monitoring modes:
+
+- Read and analyze an existing log file, such as `os_bootup.log`.
+- Monitor a log file in real time with `--timeout`, which is useful for simulating a log that is still being written.
+
+## Problem Statement
+
+During the OS boot process, the console prints many log lines. A successful boot must include all required checkpoints in the expected order. If any configured error message appears at any point, the monitor must stop immediately and report `CODE -2`.
+
+This project focuses on:
+
+- Reading boot logs line by line.
+- Detecting critical error messages as soon as they appear.
+- Matching checkpoints with regular expressions.
+- Validating checkpoint order.
+- Extracting useful boot information such as DRAM version, DDR information, firmware version, Linux version, and kernel version.
+- Printing a clear summary with checkpoint status, line numbers, and the final result code.
+
+## Diagram
+
+![SLT Test Intern Boot Monitor Diagram](./SLT_Test_Intern.drawio.png)
+
+## How It Works
+
+Main processing flow:
+
+1. The program reads the boot log line by line.
+2. Each line is checked for critical error messages first.
+3. If an error is found, monitoring stops immediately and returns `CODE -2`.
+4. If no error is found, the program checks whether the current expected checkpoint appears.
+5. When a checkpoint is matched, the program stores its label, extracted value, and line number.
+6. If all checkpoints are found in order, the program returns `CODE 0`.
+7. If the log ends before all checkpoints are found, the program returns `CODE -1`.
+
+## Project Structure
+
+```text
+.
+├── boot_monitor.py                 # Main boot log monitoring script
+├── os_bootup.log                   # Sample successful boot log
+├── live_boot.log                   # Log file used for real-time monitoring simulation
+├── test.log                        # Small test log
+├── question.txt                    # Original assignment prompt
+├── SLT_Test_Intern.drawio.png      # Project diagram
+└── README.md                       # Project documentation
+```
+
+## Requirements
+
+- Python 3.x
+- No external Python packages are required.
+
+Check your Python version:
+
+```bash
+python3 --version
+```
+
+## Usage
+
+Run the monitor with the default log file, `os_bootup.log`:
+
+```bash
+python3 boot_monitor.py
+```
+
+Run the monitor with a specific log file:
+
+```bash
+python3 boot_monitor.py live_boot.log
+```
+
+Monitor a log file in real time for 20 seconds:
+
+```bash
+python3 boot_monitor.py --timeout 20 live_boot.log
+```
+
+If your environment uses `python` instead of `python3`, you can run:
+
+```bash
+python boot_monitor.py
+```
 
 ## Result Codes
 
-- `CODE 0`: all checkpoints were found in order.
-- `CODE -1`: one or more checkpoints were missing or out of order.
-- `CODE -2`: an error message was detected.
+| Code | Meaning |
+| --- | --- |
+| `0` | Boot passed. All checkpoints were found in the correct order. |
+| `-1` | Boot failed because a checkpoint was missing, out of order, or the input could not be read. |
+| `-2` | Boot failed because a critical error message was detected. |
 
-Error messages:
-
-- `Hardware Error`
-- `AER failed`
-- `PCIe Bus Error`
-
-The script prints the final code in the summary. The operating system may wrap
-negative process exit codes, so the printed `FINAL CODE` is the value to check.
+Note: operating systems may wrap negative process exit codes when checking shell exit status. For this reason, the `FINAL CODE` printed in the summary is the value that should be checked.
 
 ## Required Checkpoints
 
-The checkpoints must appear in this order:
+The checkpoints must appear in the following order:
 
 1. `Booting Trusted Firmware`
 2. `DRAM FW version <dram_version>`
@@ -33,25 +136,13 @@ The checkpoints must appear in this order:
 8. `Kernel <kernel_version>`
 9. `login:`
 
-## Usage
+## Error Messages
 
-Use the default log file, `os_bootup.log`:
+If any of the following messages appears anywhere in the log, the monitor stops immediately and returns `CODE -2`:
 
-```bash
-python boot_monitor.py
-```
-
-Use a specific log file:
-
-```bash
-python boot_monitor.py bootup.log
-```
-
-Monitor a log file in real time for up to 20 seconds:
-
-```bash
-python boot_monitor.py --timeout 20 live_boot.log
-```
+- `Hardware Error`
+- `AER failed`
+- `PCIe Bus Error`
 
 ## Output Example
 
@@ -70,3 +161,13 @@ BOOT MONITOR SUMMARY
   ------------------------------------------------------------
     FINAL CODE: 0
 ```
+
+## Video Demo
+
+- Google Drive: [OS Boot Monitor Demo](https://drive.google.com/drive/folders/110bf6OBmUf-ztS3WL8h5Uetw636IQ3i7?usp=sharing)
+
+## Author
+
+- Name: Do Thinh Huy
+- GitHub: [nhuydohihi](https://github.com/nhuydohihi)
+- LinkedIn: `TODO: add LinkedIn profile link`
