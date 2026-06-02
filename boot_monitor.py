@@ -1,150 +1,151 @@
 import argparse
-import re
+import re 
 import sys
 import time
 
+BOOT_PASSED = 0
+BOOT_FAILED_MISSING_CHECKPOINT = -1
+BOOT_FAILED_ERROR_DETECTED = -2
 
-CODE_SUCCESS = 0
-CODE_CHECKPOINT_FAILED = -1
-CODE_ERROR_DETECTED = -2
-
-ERRORS = ("Hardware Error", "AER failed", "PCIe Bus Error")
+ERROR_DETECTOR = re.compile(
+    r"Hardware Error|AER failed|PCIe Bus Error", re.IGNORECASE
+)
 
 CHECKPOINTS = [
-    ("Booting Trusted Firmware", r"\bBooting Trusted Firmware\b"),
-    ("DRAM FW version", r"\bDRAM FW version\s+(?P<value>\S+)"),
-    ("DRAM DDR5 info", r"\bDRAM:\s+(?P<value>\S+\s+DDR5\s+\S+\s+\S+)\s+ECC\b"),
-    ("DDR init time elapsed", r"\bDDR init time elapsed:\s+(?P<value>\d{2}:\d{2}:\d{2})\b"),
-    ("Tianocore/EDK2 firmware version", r"\bTianocore/EDK2 firmware version\s+(?P<value>\S+)"),
-    ("Booting Linux on physical CPU", r"\bBooting Linux on physical CPU\b"),
-    ("Fedora Linux version", r"^\s*Fedora Linux\s+(?P<value>\d+)\b"),
-    ("Kernel version", r"^\s*Kernel\s+(?P<value>\S+)"),
-    ("Login prompt", r"\blogin:\s*$"),
+    ("Booting Trusted Firmware", re.compile(r"\bBooting Trusted Firmware\b")),
+    ("DRAM FW version", re.compile(r"\bDRAM FW version\s+(?P<value>\S+)")),
+    ("DRAM DDR5 info", re.compile(r"\bDRAM:\s+(?P<value>\S+\s+DDR5\s+\S+\s+\S+)\s+ECC\b")),
+    ("DDR init time elapsed", re.compile(r"\bDDR init time elapsed:\s+(?P<value>\d{2}:\d{2}:\d{2})\b")),
+    ("Tianocore/EDK2 firmware version", re.compile(r"\bTianocore/EDK2 firmware version\s+(?P<value>\S+)")),
+    ("Booting Linux on physical CPU", re.compile(r"\bBooting Linux on physical CPU\b")),
+    ("Fedora Linux version", re.compile(r"^\s*Fedora Linux\s+(?P<value>\d+)\b")),
+    ("Kernel version", re.compile(r"^\s*Kernel\s+(?P<value>\S+)")),
+    ("Login prompt", re.compile(r"\blogin:\s*$")),
 ]
 
-CHECKPOINTS = [(label, re.compile(pattern)) for label, pattern in CHECKPOINTS]
+# Report 
+def generate_report(status_code, status_message, captured_checkpoints, critical_error=None):
+    return {
+        "code": status_code,
+        "message": status_message,
+        "found": captured_checkpoints,
+        "error": critical_error,
+    }
 
+# Monitor 
+def start_monitoring(line_stream, verbose=False):
+    """Giám sát luồng dữ liệu log (dạng lines) theo thời gian thực."""
+    captured_checkpoints = []
+    next_checkpoint_idx = 0
+    total_checkpoints = len(CHECKPOINTS)
 
-def result(code, message, found, error=None):
-    return {"code": code, "message": message, "found": found, "error": error}
-
-
-def find_error(line):
-    line = line.lower()
-    for error in ERRORS:
-        if error.lower() in line:
-            return error
-    return None
-
-
-def monitor_lines(lines, verbose=False):
-    """Read lines and check checkpoints in order."""
-    found = []
-    current_cp = 0
-
-    for line_no, raw_line in enumerate(lines, start=1):
+    for line_no, raw_line in enumerate(line_stream, start=1):
         line = raw_line.rstrip("\r\n")
 
-        error = find_error(line)
-        if error:
+        # 1. System Errors Check 
+        error_match = ERROR_DETECTOR.search(line)
+        if error_match:
+            detected_error = error_match.group(0)
             if verbose:
-                print(f"[ERROR] line {line_no}: {error}", flush=True)
-            return result(CODE_ERROR_DETECTED, "error detected", found, error)
+                print(f"[CRITICAL ERROR] Line {line_no}: Found '{detected_error}'. Stopping monitor immediately.", flush=True)
+            return generate_report(
+                BOOT_FAILED_ERROR_DETECTED, "Critical hardware error detected", captured_checkpoints, detected_error
+            )
 
-        if current_cp >= len(CHECKPOINTS):
+        if next_checkpoint_idx >= total_checkpoints:
             continue
 
-        label, pattern = CHECKPOINTS[current_cp]
+        # 2. Check current checkpoint in order 
+        label, pattern = CHECKPOINTS[next_checkpoint_idx]
         match = pattern.search(line)
         if not match:
             continue
 
         value = match.groupdict().get("value")
-        found.append({"label": label, "line": line_no, "value": value})
+        captured_checkpoints.append({"label": label, "line": line_no, "value": value})
+
         if verbose:
             value_text = f" [{value}]" if value else ""
-            print(f"[OK] CP{current_cp + 1}: {label}{value_text} (line {line_no})", flush=True)
+            print(f"[MATCH OK] CP{next_checkpoint_idx + 1}/{total_checkpoints}: {label}{value_text} (Line {line_no})", flush=True)
 
-        current_cp += 1
-        if current_cp == len(CHECKPOINTS):
-            return result(CODE_SUCCESS, "all checkpoints found in order", found)
+        next_checkpoint_idx += 1
+        
+        if next_checkpoint_idx == total_checkpoints:
+            return generate_report(BOOT_PASSED, "All checkpoints found in correct order", captured_checkpoints)
 
-    missing_label = CHECKPOINTS[current_cp][0]
+    missing_label = CHECKPOINTS[next_checkpoint_idx][0]
+
     if verbose:
-        print(f"[FAIL] missing CP{current_cp + 1}: {missing_label}", flush=True)
-    return result(
-        CODE_CHECKPOINT_FAILED,
-        f"missing checkpoint CP{current_cp + 1}: {missing_label}",
-        found,
+        print(f"[BOOT FAILED] Missing checkpoint {next_checkpoint_idx + 1}: '{missing_label}'", flush=True)
+        
+    return generate_report(
+        BOOT_FAILED_MISSING_CHECKPOINT,
+        f"Boot sequence interrupted. Missing: {missing_label}",
+        captured_checkpoints,
     )
 
 
-def monitor_realtime(lines, verbose=False):
-    return monitor_lines(lines, verbose=verbose)
-
-
-def follow_file(path, timeout=None, poll_interval=0.2):
-    """Yield lines from a file while it is still being written."""
+def tail_file(file_path, timeout=None, poll_interval=0.2):
+    """Tối ưu I/O: Chỉ mở file 1 lần duy nhất để đọc theo thời gian thực (Giống tail -f)."""
     deadline = time.monotonic() + timeout if timeout is not None else None
-    position = 0
 
-    while True:
-        with open(path, "r", encoding="utf-8", errors="replace") as log:
-            log.seek(position)
-            yield from log
-            position = log.tell()
+    with open(file_path, "r", encoding="utf-8", errors="replace") as log_file:
+        while True:
+            for line in log_file:
+                yield line
+            if deadline is not None and time.monotonic() >= deadline:
+                break
+            time.sleep(poll_interval)
 
-        if deadline is not None and time.monotonic() >= deadline:
-            return
-
-        time.sleep(poll_interval)
-
-
-def print_summary(data):
-    print("BOOT MONITOR SUMMARY")
-    print("  " + "=" * 60)
+def print_final_summary(report):
+    """In bảng tổng hợp kết quả trực quan ra console."""
+    print("\n" + "=" * 60)
+    print("                      BOOT MONITOR SUMMARY")
+    print("=" * 60)
 
     for index, (label, _) in enumerate(CHECKPOINTS, start=1):
-        if index <= len(data["found"]):
-            item = data["found"][index - 1]
-            value = f"  [{item['value']}]" if item["value"] else ""
-            print(f"    [OK] CP{index}: {label}{value}  (line {item['line']})")
+
+        if index <= len(report["found"]):
+            item = report["found"][index - 1]
+            value = f" -> [{item['value']}]" if item["value"] else ""
+            print(f"  [OK]  CP{index}: {label:<35} (Line {item['line']}){value}")
         else:
-            print(f"    [--] CP{index}: {label}")
+            print(f"  [--]  CP{index}: {label:<35} (NOT FOUND)")
 
-    if data["error"]:
-        print("  " + "-" * 60)
-        print(f"    ERROR: {data['error']}")
-    elif data["code"] == CODE_CHECKPOINT_FAILED:
-        print("  " + "-" * 60)
-        print(f"    REASON: {data['message']}")
+    print("-" * 60)
+    if report["error"]:
+        print(f"  CRITICAL ERROR STOP: {report['error']}")
+    elif report["code"] == BOOT_FAILED_MISSING_CHECKPOINT:
+        print(f"  FAIL REASON: {report['message']}")
+        
+    print(f"  FINAL SYSTEM CODE: {report['code']}")
+    print("=" * 60)
 
-    print("  " + "-" * 60)
-    print(f"    FINAL CODE: {data['code']}")
 
-
-def parse_args():
-    parser = argparse.ArgumentParser(description="Monitor boot checkpoints.")
-    parser.add_argument("log_file", nargs="?", default="os_bootup.log")
-    parser.add_argument("--timeout", type=float, help="Monitor the log in real time.")
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Real-time OS Bootup Monitor CLI Tool.")
+    parser.add_argument("log_file", nargs="?", default="OS_bootup.log")
+    parser.add_argument("--timeout", type=float, help="Set execution time limit in seconds for real-time monitoring.")
     return parser.parse_args()
 
 
 def main():
-    args = parse_args()
-
+    args = parse_arguments()
+    
     try:
         if args.timeout is None:
-            with open(args.log_file, "r", encoding="utf-8", errors="replace") as log:
-                data = monitor_lines(log)
+            with open(args.log_file, "r", encoding="utf-8", errors="replace") as file:
+                report = start_monitoring(file, verbose=False)
+    
         else:
-            data = monitor_realtime(follow_file(args.log_file, timeout=args.timeout), verbose=True)
-    except OSError as exc:
-        data = result(CODE_CHECKPOINT_FAILED, f"cannot read input: {exc}", [])
+            print(f"[INFO] Starting real-time monitor on '{args.log_file}' with {args.timeout}s timeout...")
+            log_stream = tail_file(args.log_file, timeout=args.timeout)
+            report = start_monitoring(log_stream, verbose=True)
+            
+    except OSError as err:
+        report = generate_report(BOOT_FAILED_MISSING_CHECKPOINT, f"File System Error: {err}", [])
 
-    print_summary(data)
-    return data["code"]
+    print_final_summary(report)
+    return report["code"]
 
-
-if __name__ == "__main__":
-    sys.exit(main())
+sys.exit(main()) 

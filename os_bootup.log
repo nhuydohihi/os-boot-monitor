@@ -1,12 +1,12 @@
-NOTICE:  Booting Trusted Firmware
-NOTICE:  BL1: v2.7(release):3114bdc
+NOTICE:  Booting Trusted Firmware 
+NOTICE:  BL1: v2.7(release):3114bdc 
 NOTICE:  BL1: Built : 21:47:14, Oct 14 2025
 NOTICE:  Security flags are not enabled, Skipping platform manifest hash table authentication
 NOTICE:  BL1 time elapsed: 00:00:00
 NOTICE:  BL1: Booting BL2
 NOTICE:  BL21 to BL22 time elapsed: 00:00:00
 NOTICE:  DRAM FW version 230830-20ebfacc
-DRAM populated DIMMs:
+DRAM populated DIMMs: 
   SK0 MC0 S0: RDIMM[SKHNX] 64GB 5600 ECC 2R 16Gb 10x4 HMCG94AGBRA182N     
               SPD[MTG R.15] RCD[RAMBS R.21] PMIC[IDT R.41] TS[MTG R.14]
   SK0 MC1 S0: RDIMM[SKHNX] 64GB 5600 ECC 2R 16Gb 10x4 HMCG94AGBRA182N     
