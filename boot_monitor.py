@@ -21,7 +21,7 @@ CHECKPOINTS = [
     ("Fedora Linux version", re.compile(r"^\s*Fedora Linux\s+(?P<value>\d+)\b")),
     ("Kernel version", re.compile(r"^\s*Kernel\s+(?P<value>\S+)")),
     ("Login prompt", re.compile(r"\blogin:\s*$")),
-]
+] 
 
 # Report 
 def generate_report(status_code, status_message, captured_checkpoints, critical_error=None):
@@ -34,7 +34,7 @@ def generate_report(status_code, status_message, captured_checkpoints, critical_
 
 # Monitor 
 def start_monitoring(line_stream, verbose=False):
-    """Giám sát luồng dữ liệu log (dạng lines) theo thời gian thực."""
+
     captured_checkpoints = []
     next_checkpoint_idx = 0
     total_checkpoints = len(CHECKPOINTS)
@@ -45,13 +45,13 @@ def start_monitoring(line_stream, verbose=False):
         # 1. System Errors Check 
         error_match = ERROR_DETECTOR.search(line)
         if error_match:
-            detected_error = error_match.group(0)
-            if verbose:
+            detected_error = error_match.group(0) 
+            if verbose: 
                 print(f"[CRITICAL ERROR] Line {line_no}: Found '{detected_error}'. Stopping monitor immediately.", flush=True)
+                # Print and Return right after detecting critical error
             return generate_report(
                 BOOT_FAILED_ERROR_DETECTED, "Critical hardware error detected", captured_checkpoints, detected_error
             )
-
         if next_checkpoint_idx >= total_checkpoints:
             continue
 
@@ -73,6 +73,7 @@ def start_monitoring(line_stream, verbose=False):
         if next_checkpoint_idx == total_checkpoints:
             return generate_report(BOOT_PASSED, "All checkpoints found in correct order", captured_checkpoints)
 
+    # End of file reached but not all checkpoints found 
     missing_label = CHECKPOINTS[next_checkpoint_idx][0]
 
     if verbose:
@@ -84,9 +85,7 @@ def start_monitoring(line_stream, verbose=False):
         captured_checkpoints,
     )
 
-
 def tail_file(file_path, timeout=None, poll_interval=0.2):
-    """Tối ưu I/O: Chỉ mở file 1 lần duy nhất để đọc theo thời gian thực (Giống tail -f)."""
     deadline = time.monotonic() + timeout if timeout is not None else None
 
     with open(file_path, "r", encoding="utf-8", errors="replace") as log_file:
