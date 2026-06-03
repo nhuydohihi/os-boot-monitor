@@ -164,6 +164,12 @@ BOOT MONITOR SUMMARY
 
 ## Video Demo
 
+To run Terminal 1: 
+Get-Content .\os_bootup.log | ForEach-Object { $_ | Out-File -FilePath .\live_test.log -Append; Start-Sleep -Milliseconds 500 } 
+
+To run Terminal 2: 
+python boot_monitor.py --log-file live_test.log  
+
 - Google Drive: [OS Boot Monitor Demo](https://drive.google.com/drive/folders/110bf6OBmUf-ztS3WL8h5Uetw636IQ3i7?usp=sharing)
 
 ## Author
